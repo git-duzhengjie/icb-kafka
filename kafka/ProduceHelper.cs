@@ -1,46 +1,41 @@
-﻿using Confluent.Kafka;
+﻿using Avro;
+using Avro.Generic;
+using Confluent.Kafka;
 using Confluent.Kafka.Serialization;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace kafka
 {
-    class ProduceHelper 
+    class ProduceHelper
     {
         private string _topicName;
         private string _brokerList;
+        private string _schemaRegistryUrl;
 
-        public ProduceHelper(string topicName, string brokerList)
+        public ProduceHelper(string topicName, string brokerList, string schemaRegistryUrl)
         {
             _topicName = topicName;
             _brokerList = brokerList;
+            _schemaRegistryUrl = schemaRegistryUrl;
         }
 
-        /// <summary>
-        ///  发送消息到队列
-        /// </summary>
-        /// <param name="topic"></param>
-        /// <param name="datas"></param>
-        /// <param name="acks"></param>
-        /// <param name="timeout"></param>
-        /// <param name="codec"></param>
-        public void Pub(List<string> datas)
+
+        public void Pub(User user)
         {
-           
-            var config = new Dictionary<string, object> { { "bootstrap.servers", _brokerList } };
 
-            using (var producer = new Producer<Null, string>(config, null, new StringSerializer(Encoding.UTF8)))
-
-                foreach (string ms in datas)
+            var config = new Dictionary<string, object>
                 {
-                    var deliveryReport = producer.ProduceAsync(_topicName, null, ms);
-                    deliveryReport.ContinueWith(task =>
-                    {
-                        Console.WriteLine($"Partition: {task.Result.Partition}, Offset: {task.Result.Offset}");
-                    });
-                }
+                    { "bootstrap.servers", _brokerList },
+                    { "schema.registry.url", _schemaRegistryUrl },
+                };
+
+            using (var producer = new Producer<Null, User>(config, null, new AvroSerializer<User>()))
+            {
+                var dr = producer.ProduceAsync(_topicName, null, user).Result;
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Delivered '{dr.Value}' to: {dr.TopicPartitionOffset}");
             }
         }
+    }
 }

@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using Avro.Generic;
+using Confluent.Kafka;
 using Confluent.Kafka.Serialization;
 using System;
 using System.Collections.Generic;
@@ -9,41 +10,46 @@ namespace kafka
 {
     class ConsumerHelper
     {
-        string _topics;
-        string _brokerList;
+        private string _topics;
+        private string _brokerList;
+        private string _schemaRegistryUrl;
 
-        public ConsumerHelper(string topics, string brokerList)
+        public ConsumerHelper(string topics, string brokerList, string schemaRegistryUrl)
         {
             _topics = topics ;
             _brokerList = brokerList;
+            _schemaRegistryUrl = schemaRegistryUrl;
         }
 
-        public void Sub(Action<string> onMsg)
+        public void Sub()
         {
-            var config = new Dictionary<string, object>
-            {
-                { "group.id", "simple-csharp-consumer" },
-                { "bootstrap.servers", _brokerList }
-            };
-            using (var consumer = new Consumer<Ignore, string>(config, null, new StringDeserializer(Encoding.UTF8)))
-            {
-                consumer.Assign(new List<TopicPartitionOffset> { new TopicPartitionOffset(_topics, 0, 0) });
+            var conf = new Dictionary<string, object>
+                {
+                  { "group.id", "test-consumer-group" },
+                  { "bootstrap.servers", _brokerList },
+                  { "auto.commit.interval.ms", 5000 },
+                  { "auto.offset.reset", "earliest" },
+                  { "schema.registry.url", _schemaRegistryUrl }
+                };
 
-                // Raised on critical errors, e.g. connection failures or all brokers down.
+            using (var consumer = new Consumer<Null, User>(conf, null, new AvroDeserializer<User>()))
+            {
+                
+                consumer.OnMessage += (_, e)
+                  => Console.WriteLine($"Key: {e.Key}\nValue: {e.Value}");
+
                 consumer.OnError += (_, error)
-                    => Console.WriteLine($"Error: {error}");
+                  => Console.WriteLine($"Error: {error}");
 
-                // Raised on deserialization errors or when a consumed message has an error != NoError.
-                consumer.OnConsumeError += (_, error)
-                    => Console.WriteLine($"Consume error: {error}");
+                consumer.OnConsumeError += (_, msg)
+                  => Console.WriteLine($"Consume error ({msg.TopicPartitionOffset}): {msg.Error}");
+
+                consumer.Subscribe(_topics);
 
                 while (true)
                 {
-                    Message<Ignore, string> msg;
-                    if (consumer.Consume(out msg, TimeSpan.FromSeconds(1)))
-                    {
-                        Console.WriteLine($"Topic: {msg.Topic} Partition: {msg.Partition} Offset: {msg.Offset} {msg.Value}");
-                    }
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    consumer.Poll(TimeSpan.FromMilliseconds(100));
                 }
             }
         }

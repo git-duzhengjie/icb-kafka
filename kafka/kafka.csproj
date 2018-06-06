@@ -7,6 +7,16 @@
 
   <ItemGroup>
     <PackageReference Include="Confluent.Kafka" Version="0.11.4" />
+    <PackageReference Include="Confluent.Kafka.Avro" Version="0.11.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="avrogen">
+      <HintPath>..\..\avrogen\avrogen.dll</HintPath>
+    </Reference>
+    <Reference Include="Confluent.Apache.Avro">
+      <HintPath>..\..\avrogen\Confluent.Apache.Avro.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>
